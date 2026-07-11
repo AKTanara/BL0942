@@ -87,6 +87,12 @@ static const uint32_t BL0942_REG_MODE_DEFAULT =
 static const uint32_t BL0942_REG_SOFT_RESET_MAGIC = 0x5a5a5a;
 static const uint32_t BL0942_REG_USR_WRPROT_MAGIC = 0x55;
 
+// OT_FUNX bits [1:0] select CF1's routed function; all other bits
+// (CF2_FUNX_SEL, ZX_FUNX_SEL, reserved) must be preserved untouched by a
+// read-modify-write, since SSOP10L doesn't expose CF2/ZX at all but the
+// register's other fields still exist internally.
+static const uint32_t BL0942_REG_OT_FUNX_CF1_MASK = 0x03;
+
 BL0942::BL0942(HardwareSerial &serial, uint8_t address)
     : serial_(serial), address_(address_) {}
 
@@ -120,6 +126,32 @@ void BL0942::reset() {
 
   write_reg_(BL0942_REG_USR_WRPROT, BL0942_REG_USR_WRPROT_MAGIC);
   write_reg_(BL0942_REG_SOFT_RESET, BL0942_REG_SOFT_RESET_MAGIC);
+}
+
+void BL0942::setCF1Function(CF1Function function) {
+  write_reg_(BL0942_REG_USR_WRPROT, BL0942_REG_USR_WRPROT_MAGIC);
+
+  int current = read_reg_(BL0942_REG_OT_FUNX);
+  if (current == -1) {
+    BL0942_LOGE(TAG, "Failed to read OT_FUNX before changing CF1 function");
+    write_reg_(BL0942_REG_USR_WRPROT, 0);
+    return;
+  }
+
+  // Read-modify-write: only bits [1:0] (CF1_FUNX_SEL) change - every other
+  // bit (CF2_FUNX_SEL, ZX_FUNX_SEL, reserved) is preserved exactly as read.
+  uint32_t updated = (static_cast<uint32_t>(current) & ~BL0942_REG_OT_FUNX_CF1_MASK) |
+                     (static_cast<uint32_t>(function) & BL0942_REG_OT_FUNX_CF1_MASK);
+
+  write_reg_(BL0942_REG_OT_FUNX, updated);
+
+  if (read_reg_(BL0942_REG_OT_FUNX) != static_cast<int>(updated)) {
+    BL0942_LOGE(TAG, "Failed to verify CF1 function change (wrote 0x%02X)", updated);
+  } else {
+    BL0942_LOGI(TAG, "CF1 function set to 0x%02X", function);
+  }
+
+  write_reg_(BL0942_REG_USR_WRPROT, 0);
 }
 
 bool BL0942::loop() {
