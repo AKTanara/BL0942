@@ -13,10 +13,10 @@ namespace bl0942 {
 // Calibration values
 // Currently set for Tongou DIN rail power meter unit
 // https://github.com/esphome/esphome-docs/blob/current/components/sensor/bl0942.rst
-static const float BL0942_PREF = 613.7;
-static const float BL0942_UREF = 15850;
-static const float BL0942_IREF = 248360;
-static const float BL0942_EREF = 5268;
+static const float BL0942_PREF = 309.1;
+static const float BL0942_UREF = 15968;
+static const float BL0942_IREF = 124180;
+static const float BL0942_EREF = 2653;
 
 struct SensorData {
   float voltage;   // Voltage RMS
@@ -60,6 +60,20 @@ enum UartRate : uint8_t {
   UART_RATE_38400 = 0x03  // 38400bps
 };
 
+// Selects which internal signal is routed to the CF1 logic output pin
+// (register OT_FUNX, bits [1:0]). Only one function can be active on CF1
+// at any given moment - it's a multiplexer, not a combiner. Switching this
+// does NOT pause or affect anything computed internally (CF_CNT keeps
+// accumulating, I_FAST_RMS keeps updating, etc. regardless of what's
+// currently routed to the pin) - it only changes what reaches the pin
+// itself. Values match the OT_FUNX CF1_FUNX_SEL bit encoding directly.
+enum CF1Function : uint8_t {
+  CF1_FUNC_ENERGY_PULSE = 0x00,       // CF: active energy calibration pulse (factory default)
+  CF1_FUNC_OVERCURRENT = 0x01,        // O_C: over-current event logic output
+  CF1_FUNC_ZERO_CROSS_VOLTAGE = 0x02, // ZX_V: zero-crossing voltage
+  CF1_FUNC_ZERO_CROSS_CURRENT = 0x03  // ZX_I: zero-crossing current
+};
+
 struct ModeConfig {
   UpdateFrequency rms_update_freq = UPDATE_FREQUENCY_400MS;
   RmsWaveform rms_waveform = RMS_WAVEFORM_FULL;
@@ -82,6 +96,17 @@ public:
   void update();
 
   void print_registers();
+
+  // Changes which signal is routed to the CF1 pin at runtime (OT_FUNX
+  // register). Safe to call repeatedly/at any time after setup() - e.g.
+  // switching to CF1_FUNC_ZERO_CROSS_CURRENT briefly to time a relay
+  // latch at a current zero-crossing, then back to
+  // CF1_FUNC_ENERGY_PULSE for a normal power-proportional LED blink.
+  // Read-modify-write: only bits [1:0] of OT_FUNX are touched, so this
+  // doesn't disturb CF2/ZX pin routing on packages that have them
+  // (SSOP10L has no CF2/ZX pins, so this is the only OT_FUNX field that
+  // matters on that package).
+  void setCF1Function(CF1Function function);
 
 protected:
   struct DataPacket {
