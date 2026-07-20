@@ -13,10 +13,10 @@ namespace bl0942 {
 // Calibration values
 // Currently set for Tongou DIN rail power meter unit
 // https://github.com/esphome/esphome-docs/blob/current/components/sensor/bl0942.rst
-static const float BL0942_PREF = 309.1;
-static const float BL0942_UREF = 15968;
-static const float BL0942_IREF = 124180;
-static const float BL0942_EREF = 2653;
+static const float BL0942_PREF = 613.7;
+static const float BL0942_UREF = 15850;
+static const float BL0942_IREF = 248360;
+static const float BL0942_EREF = 5268;
 
 struct SensorData {
   float voltage;   // Voltage RMS
